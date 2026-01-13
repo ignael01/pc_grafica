@@ -1,7 +1,20 @@
+"""
+Программа не несет пользы, только для решения задач в учебном заведение.
+
+
+Задачи программы: зделать задачи по компютерной граффике
+в задачи входит
+Часть 1: алгоритм рисования линии ЦДА или Брезенхема;           /   алгоритм рисования линии ЦДА
+Часть 2: один из алгоритмов заливки: треугольников,             /   треугольников
+построченная заливка, заливка с затравкой;                      /
+Часть 3: алгоритм фильтрации (любой).                           /   Усредняющий фильтр 3×3 (Mean Filter)
+
+
+"""
+
 import pygame
 import sys
 import numpy as np
-from collections import deque
 
 # Инициализация Pygame
 pygame.init()
@@ -9,9 +22,10 @@ pygame.init()
 # Параметры окна
 WIDTH, HEIGHT = 300, 300
 screen = pygame.display.set_mode((WIDTH, HEIGHT))
-pygame.display.set_caption("Paint с ЦДА, заливкой треугольников и фильтрацией")
+pygame.display.set_caption("компютерная граффика")
 
 # Цвета
+# возможность выбрать цвет каким рисовать  по первой букве
 BLACK = (0, 0, 0)
 WHITE = (255, 255, 255)
 RED = (255, 0, 0)
@@ -23,12 +37,14 @@ MAGENTA = (255, 0, 255)
 GRAY = (128, 128, 128)
 
 # Инструменты
-LINE_TOOL = 0
-TRIANGLE_FILL_TOOL = 1
-FILTER_TOOL = 2
+LINE_TOOL = 0               #   для рисование линии
+TRIANGLE_FILL_TOOL = 1      #   для рисование триугольков
+FILTER_TOOL = 2             #   фильтр
+
 
 
 class PaintApp:
+
     def __init__(self):
         self.screen = screen
         self.width = WIDTH
@@ -57,28 +73,39 @@ class PaintApp:
 
     def dda_line(self, surface, x0, y0, x1, y1, color):
         """Алгоритм ЦДА для рисования линии"""
+        # Ввод двух конечных точек отрезка — (x1, y1) и (x2, y2).
+
+        # Вычисление разницы между координатами x и y конечных точек — dx и dy соответственно.
         dx = x1 - x0
         dy = y1 - y0
 
+
+
         steps = max(abs(dx), abs(dy))
 
+        # условия если точки будут находиться в одной точке
         if steps == 0:
             self.draw_pixel(surface, x0, y0, color)
             return
 
+        # Вычисление наклона линии — m = dy/dx.
         x_inc = dx / steps
         y_inc = dy / steps
 
         x = x0
         y = y0
 
+        # Цикл по координатам x линии, увеличение на 1 каждый раз,
+        # и вычисление соответствующей координаты y с помощью уравнения y = y1 + m(x — x1)
         for _ in range(int(steps) + 1):
             self.draw_pixel(surface, round(x), round(y), color)
             x += x_inc
             y += y_inc
 
+    # метод отрисовка треугольника с его заливкой есть первоночальные переменные в виде 3 точек
     def triangle_fill(self, surface, x1, y1, x2, y2, x3, y3, color):
         """Алгоритм заливки треугольника"""
+
         # Находим bounding box
         min_x = max(0, min(x1, x2, x3))
         max_x = min(self.width - 1, max(x1, x2, x3))
@@ -91,8 +118,15 @@ class PaintApp:
                 if self.point_in_triangle(x, y, x1, y1, x2, y2, x3, y3):
                     self.draw_pixel(surface, x, y, color)
 
+
     def point_in_triangle(self, px, py, x1, y1, x2, y2, x3, y3):
         """Проверка принадлежности точки треугольнику"""
+
+        """ барицентрические координаты — это скалярные параметры, 
+        набор которых однозначно задаёт точку аффинного пространства 
+        (при условии, что в данном пространстве выбран некоторый точечный базис)"""
+
+
         # Используем барицентрические координаты
         denom = (y2 - y3) * (x1 - x3) + (x3 - x2) * (y1 - y3)
         if denom == 0:
