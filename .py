@@ -11,7 +11,8 @@
 
 
 """
-
+from operator import truediv
+from PIL import Image
 import pygame
 import sys
 import numpy as np
@@ -23,6 +24,7 @@ pygame.init()
 WIDTH, HEIGHT = 300, 300
 screen = pygame.display.set_mode((WIDTH, HEIGHT))
 pygame.display.set_caption("компютерная граффика")
+image = r"C:\Users\admin\Desktop\ycheba\grafica\i.png"
 
 # Цвета
 # возможность выбрать цвет каким рисовать  по первой букве
@@ -40,7 +42,7 @@ GRAY = (128, 128, 128)
 LINE_TOOL = 0               #   для рисование линии
 TRIANGLE_FILL_TOOL = 1      #   для рисование триугольков
 FILTER_TOOL = 2             #   фильтр
-
+image_ = 3
 
 
 class PaintApp:
@@ -65,6 +67,7 @@ class PaintApp:
         # Шрифт для интерфейса
         self.font = pygame.font.Font(None, 24)
         self.small_font = pygame.font.Font(None, 20)
+        # self.image = image_fon()
 
     def draw_pixel(self, surface, x, y, color):
         """Отрисовка пикселя"""
@@ -111,7 +114,7 @@ class PaintApp:
         max_x = min(self.width - 1, max(x1, x2, x3))
         min_y = max(0, min(y1, y2, y3))
         max_y = min(self.height - 1, max(y1, y2, y3))
-
+        # можно ли поставить фильтр блума (не применяеться, не нашел практического применения в данной области )
         # Проверяем каждую точку в bounding box
         for y in range(min_y, max_y + 1):
             for x in range(min_x, max_x + 1):
@@ -122,13 +125,20 @@ class PaintApp:
     def point_in_triangle(self, px, py, x1, y1, x2, y2, x3, y3):
         """Проверка принадлежности точки треугольнику"""
 
-        """ барицентрические координаты — это скалярные параметры, 
-        набор которых однозначно задаёт точку аффинного пространства 
-        (при условии, что в данном пространстве выбран некоторый точечный базис)"""
+        """ Барицентрические координаты — это способ представления точки относительно вершин треугольника. Любая точка внутри треугольника может быть выражена как:
+        
+        P=a⋅A+b⋅B+c⋅C,где a+b+c=1
+        Где abc — весовые коэффициенты (координаты). Если они все находятся в диапазоне от 0 до 1, то точка лежит внутри треугольника
+        """
 
 
         # Используем барицентрические координаты
+
+        # denom - Это детерминант матрицы, используемый для решения системы уравнений
+
         denom = (y2 - y3) * (x1 - x3) + (x3 - x2) * (y1 - y3)
+
+        # если 0 значит лежит на вершине треугольника и проверка не возможна
         if denom == 0:
             return False
 
@@ -136,48 +146,57 @@ class PaintApp:
         b = ((y3 - y1) * (px - x3) + (x1 - x3) * (py - y3)) / denom
         c = 1 - a - b
 
+        # если все 3 точки находяться от 0 до 1 то точка находиться внутри треугольника
         return 0 <= a <= 1 and 0 <= b <= 1 and 0 <= c <= 1
+
+    def image_fon(self, surface):
+
+        return pygame.image.load(image).convert()
+
+    def draw_pixel(self, surface, x, y, color):
+        surface.set_at((x, y), color)
+    def get_pixel(self, surface, x, y):
+        return surface.get_at((x, y))[:3]
+
 
     def apply_filter(self, surface):
         """Алгоритм фильтрации (усредняющий фильтр 3x3)"""
         # Получаем массив пикселей
-        pixels = pygame.surfarray.array3d(surface)
-        filtered_pixels = np.zeros_like(pixels)
 
-        height, width = pixels.shape[:2]
 
-        # Применяем усредняющий фильтр 3x3
-        for y in range(1, height - 1):
-            for x in range(1, width - 1):
-                # Накапливаем значения в int32, чтобы не было переполнения
 
-                r_sum = 0
-                g_sum  = 0
-                b_sum  = 0
-                # r_sum : int = 0
-                # g_sum : int = 0
-                # b_sum : int = 0
-                count = 0
-                try:
-                    for dy in [-1, 0, 1]:
-                        for dx in [-1, 0, 1]:
-                            nx, ny = x + dx, y + dy
-                            if 0 <= nx < width and 0 <= ny < height:
-                                r_sum += int(pixels[ny, nx, 0])
-                                g_sum += int(pixels[ny, nx, 1])
-                                b_sum += int(pixels[ny, nx, 2])
-                                count += 1
-                except Exception as e:
-                    print(e)
+        # Открытие изображения
+        image_l = Image.open(image)  # Замените на путь к вашему изображению
 
-                if count > 0:
-                    filtered_pixels[y, x, 0] = np.clip(r_sum // count, 0, 255)
-                    filtered_pixels[y, x, 1] = np.clip(g_sum // count, 0, 255)
-                    filtered_pixels[y, x, 2] = np.clip(b_sum // count, 0, 255)
+        # Преобразование изображения в массив NumPy
+        image_array = np.array(image_l)
 
-        # Преобразуем обратно в поверхность
-        filtered_surface = pygame.surfarray.make_surface(filtered_pixels.swapaxes(0, 1))
-        return filtered_surface
+        print(image_array)
+        # Ядро фильтра (например, фильтр выделения границ)
+        kernel = np.array([
+            [0, -1, 0],
+            [-1, 4, -1],
+            [0, -1, 0]
+        ])
+
+        h, w = image_array.shape[:2]
+        kh, kw = kernel.shape
+        pad_h, pad_w = kh // 2, kw // 2
+
+        # Поддержка только grayscale пока что (для простоты)
+        if len(image_array.shape) == 3:
+            image_array = np.mean(image_array, axis=2).astype(np.uint8)
+
+        padded_img = np.pad(image_array, ((pad_h, pad_h), (pad_w, pad_w)), mode='edge')
+        output = np.zeros_like(image_array)
+
+        for i in range(h):
+            for j in range(w):
+                region = padded_img[i:i + kh, j:j + kw]
+                output[i, j] = np.sum(region * kernel)
+
+
+        return
 
     def handle_events(self):
         """Обработка событий"""
@@ -247,6 +266,8 @@ class PaintApp:
             self.points = []
         elif key == pygame.K_3:
             self.current_tool = FILTER_TOOL
+        elif key == pygame.K_4:
+            self.current_tool = image_
         elif key == pygame.K_c:
             # Очистка экрана
             self.drawing_surface.fill(WHITE)
@@ -351,6 +372,10 @@ class PaintApp:
             filtered_surface = self.apply_filter(self.drawing_surface)
             self.screen.blit(filtered_surface, (0, 0))
 
+        if self.current_tool == image_:
+            image_fon = self.image_fon(self.drawing_surface)  # Вызываем функцию
+            self.screen.blit(image_fon, (0, 0))
+
     def run(self):
         """Основной цикл программы"""
         clock = pygame.time.Clock()
@@ -361,6 +386,7 @@ class PaintApp:
             self.draw_interface()
             pygame.display.flip()
             clock.tick(60)
+
 
         pygame.quit()
         sys.exit()
